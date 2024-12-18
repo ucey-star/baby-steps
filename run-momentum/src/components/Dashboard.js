@@ -1,7 +1,7 @@
-// src/components/Dashboard.js
 import React, { useEffect, useState } from "react";
 import { auth, db } from "../firebase";
 import { signOut } from "firebase/auth";
+import { Timestamp } from "firebase/firestore"; // Import Timestamp
 import {
   doc,
   getDoc,
@@ -15,8 +15,7 @@ import { useNavigate } from "react-router-dom";
 function Dashboard() {
   const [currentGoal, setCurrentGoal] = useState("");
   const [newGoal, setNewGoal] = useState("");
-  const [userRunData, setUserRunData] = useState(null);
-  const [lastRunDate, setLastRunDate] = useState(null);
+  const [incrementAmount, setIncrementAmount] = useState("");
   const [hasRunToday, setHasRunToday] = useState(false);
   const navigate = useNavigate();
 
@@ -28,20 +27,13 @@ function Dashboard() {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
-          setUserRunData(data);
           setCurrentGoal(data.currentGoal);
-          setLastRunDate(data.lastRun?.toDate());
-
-          // Check if user has run today
-          const today = new Date();
+          const today = new Date().toDateString();
           if (data.lastRun) {
-            const lastRun = data.lastRun.toDate();
-            setHasRunToday(
-              lastRun.toDateString() === today.toDateString()
-            );
+            const lastRun = data.lastRun.toDate().toDateString();
+            setHasRunToday(lastRun === today);
           }
         } else {
-          // Initialize user data
           await setDoc(doc(db, "users", user.uid), {
             currentGoal: "",
             history: [],
@@ -67,31 +59,40 @@ function Dashboard() {
 
   const handleConfirmRun = async () => {
     if (!currentGoal) return;
-
-    const runDuration = parseInt(currentGoal); // In seconds
-    const runDate = new Date();
-
-    await updateDoc(doc(db, "users", user.uid), {
-      history: arrayUnion({
-        date: serverTimestamp(),
-        duration: runDuration,
-      }),
-      lastRun: serverTimestamp(),
-    });
-
-    setHasRunToday(true);
+  
+    const runDuration = parseInt(currentGoal); // Duration in minutes
+  
+    // Manually create a timestamp using Firestore's Timestamp
+    const runData = {
+      date: Timestamp.now(), // Correct way to set timestamp
+      duration: runDuration,
+    };
+  
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        history: arrayUnion(runData), // Add the object with Timestamp.now()
+        lastRun: Timestamp.now(), // Update 'lastRun' with the same timestamp
+      });
+  
+      setHasRunToday(true);
+    } catch (error) {
+      console.error("Error confirming today's run:", error.message);
+    }
   };
+  
 
   const handleIncrement = async () => {
-    // Example: Increment by 10 seconds
-    const incrementAmount = 10;
-    const newGoal = parseInt(currentGoal) + incrementAmount;
+    const incrementValue = parseInt(incrementAmount);
+    if (isNaN(incrementValue) || incrementValue <= 0) return;
+
+    const newGoal = parseInt(currentGoal) + incrementValue;
 
     await updateDoc(doc(db, "users", user.uid), {
       currentGoal: newGoal.toString(),
     });
 
     setCurrentGoal(newGoal.toString());
+    setIncrementAmount("");
   };
 
   const handleSignOut = () => {
@@ -100,62 +101,101 @@ function Dashboard() {
   };
 
   return (
-    <div className="p-4">
-      <header className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl">Dashboard</h1>
-        <button onClick={handleSignOut} className="text-red-500">
-          Sign Out
-        </button>
+    <div className="bg-gray-100 min-h-screen">
+      {/* Header */}
+      <header className="bg-blue-600 text-white py-4 shadow-md">
+        <div className="container mx-auto flex justify-between items-center px-4">
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <button
+            onClick={handleSignOut}
+            className="bg-white text-blue-600 px-4 py-1 rounded-lg hover:bg-gray-200"
+          >
+            Sign Out
+          </button>
+        </div>
       </header>
 
-      {!currentGoal ? (
-        <form onSubmit={handleSetGoal} className="flex flex-col w-80">
-          <h2 className="text-xl mb-2">Set Your Initial Running Goal</h2>
-          <input
-            type="number"
-            placeholder="Run for (seconds)"
-            value={newGoal}
-            onChange={(e) => setNewGoal(e.target.value)}
-            required
-            className="p-2 mb-2 border"
-          />
-          <button type="submit" className="p-2 bg-green-500 text-white">
-            Set Goal
-          </button>
-        </form>
-      ) : (
-        <div>
-          <h2 className="text-xl mb-2">
-            Today's Goal: {currentGoal} seconds
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        {/* Welcome Section */}
+        <div className="text-center mb-8">
+          <h2 className="text-4xl font-bold text-gray-800 mb-2">
+            Welcome, {user?.email || "User"}!
           </h2>
+          <p className="text-gray-600">
+            Let’s keep pushing your goals, one step at a time.
+          </p>
+        </div>
 
-          {!hasRunToday ? (
-            <button
-              onClick={handleConfirmRun}
-              className="p-2 bg-blue-500 text-white"
-            >
-              Confirm Today's Run
-            </button>
-          ) : (
-            <div className="mt-4">
-              <p className="mb-2">Great job! Ready to increase your goal?</p>
+        {/* Goal Section */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          {!currentGoal ? (
+            <form onSubmit={handleSetGoal} className="flex flex-col items-center">
+              <h3 className="text-2xl font-semibold mb-4 text-gray-800">
+                Set Your Initial Running Goal
+              </h3>
+              <input
+                type="number"
+                placeholder="Run for (minutes)"
+                value={newGoal}
+                onChange={(e) => setNewGoal(e.target.value)}
+                required
+                className="p-2 border rounded w-full mb-4 focus:ring-2 focus:ring-blue-600"
+              />
               <button
-                onClick={handleIncrement}
-                className="p-2 bg-green-500 text-white"
+                type="submit"
+                className="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 transition duration-300"
               >
-                Increment Goal by 10 Seconds
+                Set Goal
               </button>
+            </form>
+          ) : (
+            <div className="text-center">
+              <h3 className="text-2xl font-semibold text-gray-800 mb-4">
+                Today's Goal:{" "}
+                <span className="text-blue-600">{currentGoal} minutes</span>
+              </h3>
+              {!hasRunToday ? (
+                <button
+                  onClick={handleConfirmRun}
+                  className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition duration-300"
+                >
+                  Confirm Today's Run
+                </button>
+              ) : (
+                <div className="mt-4">
+                  <p className="text-gray-600 mb-4">Great job! Want to increase your goal?</p>
+                  <div className="flex justify-center items-center gap-4">
+                    <input
+                      type="number"
+                      placeholder="Increment by (minutes)"
+                      value={incrementAmount}
+                      onChange={(e) => setIncrementAmount(e.target.value)}
+                      className="p-2 border rounded w-40 focus:ring-2 focus:ring-green-600"
+                    />
+                    <button
+                      onClick={handleIncrement}
+                      className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-300"
+                    >
+                      Increment Goal
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
 
-      <button
-        onClick={() => navigate("/history")}
-        className="mt-4 p-2 bg-gray-500 text-white"
-      >
-        View History
-      </button>
+        {/* View History Button */}
+        <div className="text-center">
+          <button
+            onClick={() => navigate("/history")}
+            className="bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-800 transition duration-300"
+          >
+            View Run History
+          </button>
+        </div>
+      </main>
     </div>
   );
 }
