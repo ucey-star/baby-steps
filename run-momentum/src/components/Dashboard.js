@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { auth, db } from "../firebase";
 import { signOut } from "firebase/auth";
 import { Timestamp } from "firebase/firestore"; // Import Timestamp
@@ -17,6 +18,8 @@ function Dashboard() {
   const [newGoal, setNewGoal] = useState("");
   const [incrementAmount, setIncrementAmount] = useState("");
   const [hasRunToday, setHasRunToday] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [feedback, setFeedback] = useState(""); // State for AI-generated feedback
   const navigate = useNavigate();
 
   const user = auth.currentUser;
@@ -44,6 +47,27 @@ function Dashboard() {
     };
     fetchData();
   }, [user]);
+
+  const handleGenerateFeedback = async () => {
+    setIsLoading(true);
+    try {
+      const functions = getFunctions();
+      const generateFeedback = httpsCallable(functions, "generateFeedback");
+      const idToken = await user.getIdToken();
+
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const history = userDoc.data()?.history || [];
+      console.log("History:", history);
+
+      const result = await generateFeedback({ history, token: idToken });
+      setFeedback(result.data.feedback); // Display feedback
+    } catch (error) {
+      console.error("Error generating feedback:", error.message);
+      setFeedback("Failed to generate feedback. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSetGoal = async (e) => {
     e.preventDefault();
@@ -195,6 +219,32 @@ function Dashboard() {
             View Run History
           </button>
         </div>
+
+        <div className="text-center mt-6">
+          <button
+            onClick={handleGenerateFeedback}
+            className={`px-8 py-3 rounded-full font-bold text-lg transition-transform duration-300 ${
+              isLoading
+                ? "bg-gradient-to-r from-gray-400 to-gray-500 text-gray-300 cursor-not-allowed"
+                : "bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white hover:scale-105 shadow-lg"
+            }`}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <span className="animate-pulse">Generating Feedback...</span>
+            ) : (
+              "Get Feedback"
+            )}
+          </button>
+
+          {feedback && (
+            <div className="mt-6 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 p-6 rounded-lg shadow-xl">
+              <h3 className="text-2xl font-semibold text-gray-800 mb-2">Your Feedback</h3>
+              <p className="text-gray-700 leading-relaxed">{feedback}</p>
+            </div>
+          )}
+        </div>
+
       </main>
     </div>
   );
