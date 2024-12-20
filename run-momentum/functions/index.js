@@ -13,64 +13,74 @@ const openai = new OpenAI({
 admin.initializeApp();
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 exports.sendDailyEmails = onSchedule(
-    "*/5 * * * *", async (context) => {
-      const db = admin.firestore();
-      const usersCollection = db.collection("users");
+  "*/5 * * * *", async (context) => {
+    const db = admin.firestore();
+    const usersCollection = db.collection("users");
 
-      try {
-        const snapshot = await usersCollection.get();
-        const users = snapshot.docs.map((doc) => doc.data());
-        console.log("Users:", users);
 
-        const emailPromises = users.map((user) => {
-          if (true) {
-            const msg = {
-              to: "uche@uni.minerva.edu",
-              from: "uchechij15@gmail.com",
-              subject: "🌟 Stay on Track with Your Goals! 🌟",
-              text: `Hello,
+    try {
+      const snapshot = await usersCollection.get();
+      const users = snapshot.docs.map((doc) => doc.data());
+      console.log("Users:", users);
 
-                We hope this message finds you well! Here's your friendly reminder to log in and track your progress today. Remember, every step you take brings you closer to achieving your goals!
 
-                Click below to log in and keep your streak alive:
+      const emailPromises = users.map((user) => {
+        if (true) {
+          const msg = {
+            to: "uche@uni.minerva.edu",
+            from: "uchechij15@gmail.com",
+            subject: "🌟 Stay on Track with Your Goals! 🌟",
+            text: `Hello,
 
-                [Log in Now](https://your-app-link.com)
 
-                Stay motivated, and let’s make today count!
+              We hope this message finds you well! Here's your friendly reminder to log in and track your progress today. Remember, every step you take brings you closer to achieving your goals!
 
-                Best regards,
-                The Motivation Team`,
-                  html: `
-                    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-                      <h2 style="color: #4CAF50;">🌟 Stay on Track with Your Goals! 🌟</h2>
-                      <p>Hi there,</p>
-                      <p>We hope this message finds you well! Here's your friendly reminder to log in and track your progress today. Remember, every step you take brings you closer to achieving your goals!</p>
-                      <a href="https://your-app-link.com" style="display: inline-block; padding: 10px 20px; color: #fff; background-color: #4CAF50; text-decoration: none; border-radius: 5px;">Log in Now</a>
-                      <p style="margin-top: 20px;">Stay motivated, and let’s make today count!</p>
-                      <p>Best regards,<br/><strong>The Motivation Team</strong></p>
-                    </div>
-                  `,
-                  };
-            return sgMail.send(msg);
-          }
-        });
 
-        await Promise.all(emailPromises);
-        console.log("Daily emails sent successfully.");
-      } catch (error) {
-        console.error("Error sending daily emails:", error);
-      }
+              Click below to log in and keep your streak alive:
 
-      return null;
-    });
+
+              [Log in Now](https://your-app-link.com)
+
+
+              Stay motivated, and let’s make today count!
+
+
+              Best regards,
+              The Motivation Team`,
+                html: `
+                  <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+                    <h2 style="color: #4CAF50;">🌟 Stay on Track with Your Goals! 🌟</h2>
+                    <p>Hi there,</p>
+                    <p>We hope this message finds you well! Here's your friendly reminder to log in and track your progress today. Remember, every step you take brings you closer to achieving your goals!</p>
+                    <a href="https://your-app-link.com" style="display: inline-block; padding: 10px 20px; color: #fff; background-color: #4CAF50; text-decoration: none; border-radius: 5px;">Log in Now</a>
+                    <p style="margin-top: 20px;">Stay motivated, and let’s make today count!</p>
+                    <p>Best regards,<br/><strong>The Motivation Team</strong></p>
+                  </div>
+                `,
+                };
+          return sgMail.send(msg);
+        }
+      });
+
+
+      await Promise.all(emailPromises);
+      console.log("Daily emails sent successfully.");
+    } catch (error) {
+      console.error("Error sending daily emails:", error);
+    }
+
+
+    return null;
+  });
+
 
 exports.generateFeedback = functions.https.onCall(async (data, context) => {
-  console.log("Auth context:", context.auth);
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-        "unauthenticated",
-        "User must be signed in.");
-  }
+  // console.log("Auth context:", context.auth);
+  // if (!context.auth) {
+  //   throw new functions.https.HttpsError(
+  //       "unauthenticated",
+  //       "User must be signed in.");
+  // }
   console.log("Data:", data);
   const history = data.data?.history; // Expect run history array
   console.log("History:", history);
